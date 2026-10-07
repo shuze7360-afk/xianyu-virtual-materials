@@ -42,3 +42,15 @@
 ## 万能钥匙
 
 到期 / 想改有效期 / 怀疑泄露 → 重新 `file_sharelink_set` 生成一条新的即可，旧的自然过期。生成新链接能修复一切链接问题。
+
+## token 过期恢复与分享网关（2026-10-07 实测补充）
+
+### 症状与授权
+- `upload_file` 报 errno **-6**、curl file?method=list 同样 -6 = token 过期（与 20017 复制不全区分：先 curl 预检）
+- 恢复：项目 README 里的 oob 授权 URL（response_type=token）→ 浏览器授权后页面直接显示 access_token → **用户常把 &session_secret=... 一起复制，取 & 之前的主串**；先 curl 预检再写回 config 两处（全局替换旧 token，留 .bak）
+
+### 免重启直连（当次绕过 MCP）
+- 改 config 只在下次 ZCode 重启后影响 MCP；当次用脚本直连（token 走环境变量，勿落日志）
+- **上传可直连 REST**：precreate → pcs/superfile2 → create（rtype=1 覆盖同路径会生成新 fs_id）；superfile2 成功返回 `{"md5":...}` **无 errno 字段**，别按 errno 断言
+- **分享直连不通**：rest/2.0/xpan/share?method=set 全档期 errno=2 → 必须走官方 MCP 网关：Python313 + `mcp.client.sse` 连 `https://mcp-pan.baidu.com/sse?access_token=<token>` 直调 `file_sharelink_set`（fsid_list=字符串化JSON数组、period=数字、pwd=4位）
+- 所有直连绕代理（见 pitfalls #8）：curl `env -u` 三变量，requests `trust_env=False`
