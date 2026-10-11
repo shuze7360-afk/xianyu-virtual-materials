@@ -21,8 +21,7 @@
   python auto_delivery.py --mode probe        # 页面结构侦察
 
 退出码：0 正常（含"无事可做"）| 3 登录失效 | 4 页面结构不认识 | 5 有发送失败
-依赖：Playwright（chromium）+ 闲鱼网页版 Cookie 文件（JSON 数组格式，可由 FishClaw MCP 等
-任意登录流程产出，路径用环境变量 XIANYU_COOKIES 指定，默认 ~/.goofish-auto-delivery/）。
+依赖：FishClaw 的 Playwright 环境与其 Cookie 缓存（只读共享，互不干扰）。
 """
 import argparse
 import json
@@ -40,8 +39,7 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 BASE = Path(__file__).parent
 COOKIES_PATH = Path(os.environ.get(
-    "XIANYU_COOKIES",
-    str(Path.home() / ".goofish-auto-delivery" / "xianyu_cookies.json")))
+    "XIANYU_COOKIES", str(Path.home() / ".goofish-auto-delivery" / "xianyu_cookies.json")))
 CONFIG_PATH = BASE / "listing_links.json"
 LEDGER_PATH = BASE / "delivery_ledger.json"
 REPORT_DIR = BASE / "reports"
@@ -124,25 +122,6 @@ class Browser:
             self._pw.stop()
         except Exception:
             pass
-
-    def is_logged_in(self):
-        """只认正向特征；已登录页顶栏/页脚也可能有『登录』链接，不能拿它当未登录证据。"""
-        page = self.page
-        if "login.taobao.com" in page.url:
-            return False
-        for sel in ['a[href*="/personal"]', 'img[class*="avatar"]', 'div[class*="avatar"]']:
-            try:
-                if page.locator(sel).first.is_visible(timeout=700):
-                    return True
-            except Exception:
-                pass
-        for kw in ["订单", "收藏"]:
-            try:
-                if page.locator(f'text="{kw}"').first.is_visible(timeout=600):
-                    return True
-            except Exception:
-                pass
-        return False
 
     def dump(self, name):
         """把当前页面 dump 到 recon/，用于页面改版排查。"""
@@ -300,14 +279,9 @@ def main():
 
     b = Browser(headless=os.environ.get("XIANYU_HEADLESS", "") == "1")
     try:
-        b.page.goto("https://www.goofish.com", wait_until="domcontentloaded", timeout=30000)
-        delay(2.0, 3.0)
-        if not b.is_logged_in():
-            log("!! 登录已失效：请让助手调用 fishclaw login 扫码，Cookie 会自动共享")
-            report["errors"].append("login_expired")
-            return finish(report, 3)
-
         if args.mode == "probe":
+            b.page.goto("https://www.goofish.com", wait_until="domcontentloaded", timeout=30000)
+            delay(2.0, 3.0)
             b.dump("probe_home")
             b.page.goto("https://www.goofish.com/im", wait_until="domcontentloaded", timeout=30000)
             delay(3.0, 4.0)
@@ -315,9 +289,19 @@ def main():
             log("probe 完成：现场已存 recon/")
             return finish(report, 0)
 
+        # 登录检测基于 /im 页面本身：未登录时它是几十字的空壳页。
+        # 不能拿"订单/收藏"等纯文本当正向特征——未登录壳的导航里也有（2026-10-11 实测）
+        b.page.goto("https://www.goofish.com/im", wait_until="domcontentloaded", timeout=30000)
+        delay(3.0, 4.0)
         convs = scan_conversation_list(b)
         if not convs:
-            b.dump("im_no_conversations")
+            shell = re.sub(r"\s+", "", b.body_text())
+            if len(shell) < 120 and "登录" in shell:
+                log("!! 登录已失效：请让助手调用 fishclaw login 扫码，Cookie 会自动共享")
+                report["errors"].append("login_expired")
+                return finish(report, 3)
+            b.dump("im_structure_changed")
+            log("!! /im 结构不认识（已 dump 现场）")
             report["errors"].append("conversation_list_not_parsed")
             return finish(report, 4)
 
