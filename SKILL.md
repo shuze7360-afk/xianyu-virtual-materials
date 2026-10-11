@@ -42,7 +42,7 @@ description: 闲鱼虚拟资料（考研/学习类数字商品）全流程SOP：
 | 3 网盘上传分享 | MCP 上传 + 生成分享链接 | 路径 /apps/ 开头；有效期先试 365 天；pwd 正好 4 位 | [references/netdisk-share.md](references/netdisk-share.md) |
 | 4 闲鱼发布 | 资料类走 FishClaw；服务类走 Playwright 破解 | draft 只在 restart+login 后第一次稳定；发布前四查 | [references/publish-xianyu.md](references/publish-xianyu.md) |
 | 5 售后运营 | 确认收货后代发、到期续链；可选全自动（/im 会话芯片巡检） | 只发"对外唯一"链接；消息频率防风控 | 同上 |
-| 速查 | 35 条环境级踩坑 | 出错先查表，别瞎试 | [references/pitfalls.md](references/pitfalls.md) |
+| 速查 | 36 条环境级踩坑 | 出错先查表，别瞎试 | [references/pitfalls.md](references/pitfalls.md) |
 | 模板 | 完整发布文案（脱敏通用版） | 换占位符即用 | [references/listing-template.md](references/listing-template.md) |
 
 ## 阶段要点速记
